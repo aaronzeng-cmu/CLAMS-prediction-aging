@@ -1,0 +1,38 @@
+# Reference model (do not push)
+Reference/
+
+# EEG data (large, sensitive)
+data/raw/
+data/processed/
+*.edf
+*.bdf
+*.mff
+*.set
+*.fdt
+
+# Trained model binaries (track selectively via models/)
+*.onnx
+
+# MATLAB
+*.asv
+*.m~
+*.mex*
+slprj/
+*.slxc
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+dist/
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
