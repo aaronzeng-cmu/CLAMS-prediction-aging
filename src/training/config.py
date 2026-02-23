@@ -4,9 +4,24 @@ No logic — only frozen dataclasses.
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import Optional
 import yaml
+
+
+@dataclass(frozen=True)
+class DataConfig:
+    """Cluster data access parameters."""
+    data_dir: str = field(
+        default_factory=lambda: os.environ.get(
+            'AGING_DATA_DIR',
+            '/orcd/data/ldlewis/001/om2/shared/aging',
+        )
+    )
+    eeg_channel: int = 16       # Fpz (0-indexed)
+    source_fs: int = 500        # raw data sample rate before downsampling
+    age_group: str = 'aging'    # 'aging' | 'young' | 'all'
 
 
 @dataclass(frozen=True)
@@ -59,6 +74,8 @@ class TrainingConfig:
     seed: int = 42
     clip_grad_norm: float = 1.0
     model_dir: str = 'models/'
+    output_dir: str = 'output/'
+    data_config: DataConfig = field(default_factory=DataConfig)
     feature_config: FeatureConfig = field(default_factory=FeatureConfig)
     label_config: LabelConfig = field(default_factory=LabelConfig)
     lstm_config: LSTMConfig = field(default_factory=LSTMConfig)
@@ -79,6 +96,7 @@ def config_from_yaml(path: str) -> TrainingConfig:
     with open(path, 'r') as f:
         data = yaml.safe_load(f)
 
+    data_cfg = DataConfig(**data.pop('data_config', {}))
     feature_cfg = FeatureConfig(**data.pop('feature_config', {}))
     label_cfg = LabelConfig(**data.pop('label_config', {}))
     lstm_cfg = LSTMConfig(**data.pop('lstm_config', {}))
@@ -88,9 +106,37 @@ def config_from_yaml(path: str) -> TrainingConfig:
     tcn_cfg = TCNConfig(**tcn_raw)
 
     return TrainingConfig(
+        data_config=data_cfg,
         feature_config=feature_cfg,
         label_config=label_cfg,
         lstm_config=lstm_cfg,
         tcn_config=tcn_cfg,
         **data,
     )
+
+
+def config_to_yaml(config: TrainingConfig, path: str) -> None:
+    """Serialise a TrainingConfig to a human-readable YAML file.
+
+    Nested frozen dataclasses are serialised as nested mappings.
+    Tuples are converted to lists for YAML compatibility.
+
+    Args:
+        config: TrainingConfig to serialise.
+        path:   Destination file path (parent directories created if absent).
+    """
+    import dataclasses
+
+    def _to_dict(obj):
+        if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+            return {
+                k: _to_dict(v)
+                for k, v in dataclasses.asdict(obj).items()
+            }
+        if isinstance(obj, tuple):
+            return list(obj)
+        return obj
+
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    with open(path, 'w') as f:
+        yaml.dump(_to_dict(config), f, default_flow_style=False, sort_keys=False)
